@@ -8,50 +8,33 @@
   <meta name="apple-mobile-web-app-title" content="構文マスター">
   <link rel="manifest" href="manifest.json">
   <title>英語構文マスター</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     :root {
-      --bg: #0d0d1a;
-      --surface: #16162a;
-      --card-bg: #1c1c35;
-      --accent: #7c6afc;
-      --accent-light: #a78bfa;
-      --text: #e8e8f5;
-      --muted: #7070a0;
-      --border: #252545;
-      --success: #4ade80;
-      --danger: #f87171;
-      --warning: #fbbf24;
-      --blue: #60a5fa;
-      --radius: 14px;
-      --tab-h: 72px;
-      --header-h: 56px;
+      --bg: #0d0d1a; --surface: #16162a; --card-bg: #1c1c35;
+      --accent: #7c6afc; --accent-light: #a78bfa;
+      --text: #e8e8f5; --muted: #7070a0; --border: #252545;
+      --success: #4ade80; --danger: #f87171; --warning: #fbbf24;
+      --blue: #60a5fa; --radius: 14px; --tab-h: 72px; --header-h: 56px;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       height: 100%;
       font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      -webkit-tap-highlight-color: transparent;
-      overflow: hidden;
+      background: var(--bg); color: var(--text);
+      -webkit-tap-highlight-color: transparent; overflow: hidden;
     }
-    #root {
-      max-width: 430px;
-      margin: 0 auto;
-      height: 100%;
-      position: relative;
-    }
+    #root { max-width: 430px; margin: 0 auto; height: 100%; position: relative; }
 
     /* ─── Header ─── */
     .app-header {
       position: fixed; top: 0; left: 50%; transform: translateX(-50%);
-      width: 100%; max-width: 430px;
-      height: var(--header-h);
+      width: 100%; max-width: 430px; height: var(--header-h);
       background: rgba(13,13,26,0.85);
       backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
       border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; padding: 0 20px;
-      z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; z-index: 100;
     }
     .app-header h1 {
       font-size: 17px; font-weight: 800;
@@ -59,8 +42,34 @@
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       background-clip: text;
     }
+    .sync-indicator {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--muted);
+    }
+    .sync-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted); transition: background .3s;
+    }
+    .sync-dot.ok     { background: var(--success); }
+    .sync-dot.syncing{ background: var(--warning); animation: pulse 1s infinite; }
+    .sync-dot.error  { background: var(--danger); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
-    /* ─── Main scroll area ─── */
+    /* ─── Loading overlay ─── */
+    #loading {
+      position: fixed; inset: 0; background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; z-index: 500;
+    }
+    #loading .spin {
+      width: 40px; height: 40px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin-bottom: 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { color: var(--muted); font-size: 14px; }
+
+    /* ─── Main ─── */
     #app-main {
       position: fixed; top: var(--header-h); bottom: var(--tab-h);
       left: 50%; transform: translateX(-50%);
@@ -68,16 +77,13 @@
       overflow-y: auto; -webkit-overflow-scrolling: touch;
       padding: 16px 16px 8px;
     }
-
-    /* ─── Pages ─── */
     .page { display: none; }
     .page.active { display: block; }
 
     /* ─── Bottom Nav ─── */
     .bottom-nav {
       position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-      width: 100%; max-width: 430px;
-      height: var(--tab-h);
+      width: 100%; max-width: 430px; height: var(--tab-h);
       background: rgba(13,13,26,0.9);
       backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
       border-top: 1px solid var(--border);
@@ -89,32 +95,18 @@
       align-items: center; justify-content: center; gap: 3px;
       background: none; border: none;
       color: var(--muted); font-size: 10px; font-weight: 600;
-      cursor: pointer; transition: color 0.2s;
-      padding-bottom: 4px;
+      cursor: pointer; transition: color 0.2s; padding-bottom: 4px;
     }
     .nav-btn.active { color: var(--accent-light); }
     .nav-btn svg { width: 22px; height: 22px; }
 
-    /* ─── Section header ─── */
-    .section-header {
-      font-size: 22px; font-weight: 800;
-      margin-bottom: 16px; letter-spacing: -0.3px;
-    }
-    .section-title {
-      font-size: 11px; font-weight: 700;
-      color: var(--muted); text-transform: uppercase;
-      letter-spacing: 1px; margin-bottom: 10px;
-    }
+    /* ─── Section ─── */
+    .section-header { font-size: 22px; font-weight: 800; margin-bottom: 16px; letter-spacing: -0.3px; }
+    .section-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
 
     /* ─── Stat cards ─── */
-    .stats-row {
-      display: grid; grid-template-columns: repeat(3, 1fr);
-      gap: 10px; margin-bottom: 18px;
-    }
-    .stat-card {
-      background: var(--card-bg); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 14px 8px; text-align: center;
-    }
+    .stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 18px; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 8px; text-align: center; }
     .stat-card .num { font-size: 30px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
     .stat-card .lbl { font-size: 11px; color: var(--muted); }
     .stat-card.due .num { color: var(--warning); }
@@ -127,267 +119,23 @@
       border: none; border-radius: var(--radius);
       padding: 14px 20px; font-size: 15px; font-weight: 700;
       cursor: pointer; width: 100%; margin-bottom: 10px;
-      transition: opacity .15s, transform .1s;
-      font-family: inherit;
+      transition: opacity .15s, transform .1s; font-family: inherit;
     }
     .btn:active { transform: scale(0.97); opacity: 0.85; }
     .btn-primary { background: var(--accent); color: #fff; }
-    .btn-outline {
-      background: transparent; color: var(--text);
-      border: 1px solid var(--border);
-    }
-    .btn-success { background: var(--success); color: #111; }
-    .btn-danger  { background: var(--danger);  color: #fff; }
+    .btn-outline  { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-success  { background: var(--success); color: #111; }
+    .btn-danger   { background: var(--danger);  color: #fff; }
     .btn:disabled { opacity: 0.35; cursor: default; }
 
-    /* ─── Surface card ─── */
-    .surface {
-      background: var(--card-bg); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
-    }
+    /* ─── Surface ─── */
+    .surface { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
 
-    /* ─── Stage progress bars ─── */
+    /* ─── Stage bars ─── */
     .stage-row { margin-bottom: 12px; }
-    .stage-row-header {
-      display: flex; justify-content: space-between;
-      font-size: 13px; margin-bottom: 5px;
-    }
-    .bar-track {
-      height: 7px; background: var(--border);
-      border-radius: 4px; overflow: hidden;
-    }
-    .bar-fill {
-      height: 100%; border-radius: 4px;
-      transition: width 0.6s ease;
-    }
-
-    /* ─── Study Overlay ─── */
-    #study-overlay {
-      display: none; position: fixed; inset: 0;
-      background: var(--bg); z-index: 200;
-      flex-direction: column;
-    }
-    #study-overlay.open { display: flex; }
-    .study-top {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 20px;
-      padding-top: max(16px, env(safe-area-inset-top));
-      border-bottom: 1px solid var(--border);
-    }
-    .study-title { font-size: 15px; font-weight: 700; }
-    .study-prog-txt { font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .close-btn {
-      background: none; border: none; color: var(--muted);
-      font-size: 22px; line-height: 1; cursor: pointer; padding: 4px;
-    }
-    .prog-track { height: 3px; background: var(--border); }
-    .prog-fill { height: 100%; background: var(--accent); transition: width 0.3s; }
-    .study-body {
-      flex: 1; display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 20px; overflow: hidden;
-    }
-
-    /* ─── Flashcard ─── */
-    .fc-scene {
-      width: 100%; max-width: 360px;
-      perspective: 1000px; cursor: pointer; margin-bottom: 20px;
-    }
-    .fc-inner {
-      width: 100%; padding-bottom: 62%;
-      position: relative; transform-style: preserve-3d;
-      transition: transform 0.45s cubic-bezier(.4,0,.2,1);
-    }
-    .fc-inner.flipped { transform: rotateY(180deg); }
-    .fc-face {
-      position: absolute; inset: 0; border-radius: 20px;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 20px; backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
-    }
-    .fc-front {
-      background: linear-gradient(135deg, #1c1c4a, #2a1a5e);
-      border: 1.5px solid rgba(124,106,252,0.5);
-    }
-    .fc-back {
-      background: linear-gradient(135deg, #162e1a, #1a3d28);
-      border: 1.5px solid rgba(74,222,128,0.4);
-      transform: rotateY(180deg);
-    }
-    .fc-label {
-      font-size: 10px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 1.5px; color: var(--muted); margin-bottom: 10px;
-    }
-    .fc-pattern {
-      font-size: 19px; font-weight: 700; text-align: center;
-      line-height: 1.45; color: #fff;
-    }
-    .fc-example {
-      font-size: 13px; color: rgba(255,255,255,.55);
-      text-align: center; margin-top: 10px; line-height: 1.5;
-      font-style: italic;
-    }
-    .fc-translation {
-      font-size: 18px; font-weight: 700;
-      text-align: center; color: var(--success);
-    }
-    .fc-note {
-      font-size: 12px; color: rgba(255,255,255,.45);
-      text-align: center; margin-top: 8px; line-height: 1.55;
-    }
-    .tap-hint {
-      font-size: 12px; color: var(--muted);
-      text-align: center; margin-bottom: 14px;
-      min-height: 18px;
-    }
-    .study-actions {
-      width: 100%; max-width: 360px;
-      display: flex; gap: 12px;
-      opacity: 0; pointer-events: none; transition: opacity 0.2s;
-    }
-    .study-actions.visible { opacity: 1; pointer-events: auto; }
-    .study-actions .btn { margin-bottom: 0; flex: 1; }
-
-    /* ─── Study complete ─── */
-    .study-done {
-      text-align: center; padding: 20px;
-    }
-    .study-done .icon { font-size: 64px; margin-bottom: 16px; }
-    .study-done h2 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
-    .study-done p { color: var(--muted); font-size: 14px; line-height: 1.6; }
-
-    /* ─── Card list ─── */
-    .search-box {
-      width: 100%; background: var(--card-bg);
-      border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 11px 16px; font-size: 15px; color: var(--text);
-      outline: none; margin-bottom: 12px; font-family: inherit;
-      transition: border-color .2s;
-    }
-    .search-box:focus { border-color: var(--accent); }
-    .search-box::placeholder { color: var(--muted); }
-
-    .filter-row {
-      display: flex; gap: 8px; margin-bottom: 12px;
-      overflow-x: auto; scrollbar-width: none;
-    }
-    .filter-row::-webkit-scrollbar { display: none; }
-    .chip {
-      padding: 7px 14px; border-radius: 20px;
-      font-size: 12px; font-weight: 700;
-      border: 1px solid var(--border);
-      background: none; color: var(--muted);
-      cursor: pointer; white-space: nowrap; flex-shrink: 0;
-      transition: all .2s; font-family: inherit;
-    }
-    .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-
-    .list-item {
-      background: var(--card-bg); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 13px 14px;
-      margin-bottom: 9px; cursor: pointer;
-      transition: border-color .2s;
-    }
-    .list-item:active { border-color: var(--accent); }
-    .list-item-top {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 3px;
-    }
-    .li-pattern {
-      font-size: 15px; font-weight: 600;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      flex: 1; margin-right: 8px;
-    }
-    .badge {
-      font-size: 10px; font-weight: 700;
-      padding: 3px 8px; border-radius: 20px; flex-shrink: 0;
-    }
-    .badge-0  { background: rgba(96,165,250,.2);  color: var(--blue);    }
-    .badge-1  { background: rgba(251,191,36,.2);  color: var(--warning); }
-    .badge-2  { background: rgba(251,146,60,.2);  color: #fb923c;        }
-    .badge-3  { background: rgba(167,139,250,.2); color: var(--accent-light); }
-    .badge-4  { background: rgba(74,222,128,.2);  color: var(--success); }
-    .li-trans {
-      font-size: 13px; color: var(--muted);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .li-review { font-size: 11px; color: var(--muted); margin-top: 3px; }
-    .li-review.due { color: var(--warning); }
-
-    /* ─── FAB ─── */
-    .fab {
-      position: fixed;
-      bottom: calc(var(--tab-h) + 14px);
-      right: max(16px, calc(50% - 215px + 16px));
-      width: 52px; height: 52px; border-radius: 50%;
-      background: var(--accent); border: none; color: #fff;
-      font-size: 26px; cursor: pointer;
-      display: none; align-items: center; justify-content: center;
-      box-shadow: 0 4px 24px rgba(124,106,252,.5);
-      z-index: 50; transition: transform .15s;
-      line-height: 1;
-    }
-    .fab:active { transform: scale(0.9); }
-
-    /* ─── Modal ─── */
-    #card-modal {
-      display: none; position: fixed; inset: 0; z-index: 300;
-    }
-    #card-modal.open { display: block; }
-    .modal-bg {
-      position: absolute; inset: 0;
-      background: rgba(0,0,0,.65);
-      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    }
-    .modal-sheet {
-      position: absolute; bottom: 0;
-      left: 50%; transform: translateX(-50%);
-      width: 100%; max-width: 430px;
-      background: var(--surface);
-      border-radius: 22px 22px 0 0;
-      padding: 20px;
-      padding-bottom: max(24px, env(safe-area-inset-bottom));
-      max-height: 92vh; overflow-y: auto;
-    }
-    .modal-handle {
-      width: 36px; height: 4px; background: var(--border);
-      border-radius: 2px; margin: 0 auto 18px;
-    }
-    .modal-title { font-size: 18px; font-weight: 800; margin-bottom: 18px; }
-    .form-label {
-      display: block; font-size: 11px; font-weight: 700;
-      color: var(--muted); text-transform: uppercase;
-      letter-spacing: .8px; margin-bottom: 6px;
-    }
-    .form-input {
-      width: 100%; background: var(--card-bg);
-      border: 1px solid var(--border); border-radius: 10px;
-      padding: 12px 14px; font-size: 15px; color: var(--text);
-      outline: none; margin-bottom: 14px;
-      font-family: inherit; resize: vertical;
-      transition: border-color .2s; min-height: 44px;
-    }
-    .form-input:focus { border-color: var(--accent); }
-    .modal-btns { display: flex; gap: 10px; margin-top: 4px; }
-    .modal-btns .btn { margin-bottom: 0; flex: 1; }
-
-    /* ─── Empty state ─── */
-    .empty {
-      text-align: center; padding: 48px 20px; color: var(--muted);
-    }
-    .empty .e-icon { font-size: 48px; margin-bottom: 12px; }
-    .empty p { font-size: 14px; line-height: 1.6; }
-
-    /* ─── Stats detail ─── */
-    .kv-row {
-      display: flex; justify-content: space-between;
-      font-size: 14px; padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .kv-row:last-child { border-bottom: none; }
-    .kv-row span { color: var(--muted); }
-    .kv-row strong { color: var(--text); }
+    .stage-row-header { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; }
+    .bar-track { height: 7px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .bar-fill  { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
 
     /* ─── Direction Toggle ─── */
     .dir-toggle {
@@ -401,28 +149,139 @@
       background: none; color: var(--muted);
       transition: all .2s; font-family: inherit; line-height: 1.4;
     }
-    .dir-btn.active {
-      background: var(--accent); color: #fff;
-      box-shadow: 0 2px 10px rgba(124,106,252,.4);
+    .dir-btn.active { background: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(124,106,252,.4); }
+    .dir-badge      { display: inline-block; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 8px; margin-top: 3px; background: rgba(255,255,255,.15); color: rgba(255,255,255,.8); }
+    .dir-badge-muted{ display: inline-block; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 8px; margin-top: 3px; background: rgba(255,255,255,.06); color: var(--muted); }
+
+    /* ─── Study Overlay ─── */
+    #study-overlay {
+      display: none; position: fixed; inset: 0;
+      background: var(--bg); z-index: 200; flex-direction: column;
     }
-    .dir-badge {
-      display: inline-block; font-size: 9px; font-weight: 700;
-      padding: 2px 6px; border-radius: 8px; margin-top: 3px;
-      background: rgba(255,255,255,.15); color: rgba(255,255,255,.8);
+    #study-overlay.open { display: flex; }
+    .study-top {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; padding-top: max(16px, env(safe-area-inset-top));
+      border-bottom: 1px solid var(--border);
     }
-    .dir-badge-muted {
-      display: inline-block; font-size: 9px; font-weight: 700;
-      padding: 2px 6px; border-radius: 8px; margin-top: 3px;
-      background: rgba(255,255,255,.06); color: var(--muted);
+    .study-title { font-size: 15px; font-weight: 700; }
+    .study-prog-txt { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .close-btn { background: none; border: none; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; padding: 4px; }
+    .prog-track { height: 3px; background: var(--border); }
+    .prog-fill  { height: 100%; background: var(--accent); transition: width 0.3s; }
+    .study-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; overflow: hidden; }
+
+    /* ─── Flashcard ─── */
+    .fc-scene { width: 100%; max-width: 360px; perspective: 1000px; cursor: pointer; margin-bottom: 20px; }
+    .fc-inner { width: 100%; padding-bottom: 62%; position: relative; transform-style: preserve-3d; transition: transform 0.45s cubic-bezier(.4,0,.2,1); }
+    .fc-inner.flipped { transform: rotateY(180deg); }
+    .fc-face { position: absolute; inset: 0; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .fc-front { background: linear-gradient(135deg,#1c1c4a,#2a1a5e); border: 1.5px solid rgba(124,106,252,.5); }
+    .fc-back  { background: linear-gradient(135deg,#162e1a,#1a3d28); border: 1.5px solid rgba(74,222,128,.4); transform: rotateY(180deg); }
+    .fc-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 10px; }
+    .fc-pattern     { font-size: 19px; font-weight: 700; text-align: center; line-height: 1.45; color: #fff; }
+    .fc-example     { font-size: 13px; color: rgba(255,255,255,.55); text-align: center; margin-top: 10px; line-height: 1.5; font-style: italic; }
+    .fc-translation { font-size: 18px; font-weight: 700; text-align: center; color: var(--success); }
+    .fc-note        { font-size: 12px; color: rgba(255,255,255,.45); text-align: center; margin-top: 8px; line-height: 1.55; }
+    .tap-hint { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 14px; min-height: 18px; }
+    .study-actions { width: 100%; max-width: 360px; display: flex; gap: 12px; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .study-actions.visible { opacity: 1; pointer-events: auto; }
+    .study-actions .btn { margin-bottom: 0; flex: 1; }
+    .study-done { text-align: center; padding: 20px; }
+    .study-done .icon { font-size: 64px; margin-bottom: 16px; }
+    .study-done h2 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+    .study-done p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+
+    /* ─── Card list ─── */
+    .search-box {
+      width: 100%; background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 11px 16px; font-size: 15px;
+      color: var(--text); outline: none; margin-bottom: 12px; font-family: inherit;
+      transition: border-color .2s;
     }
+    .search-box:focus { border-color: var(--accent); }
+    .search-box::placeholder { color: var(--muted); }
+    .filter-row { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; scrollbar-width: none; }
+    .filter-row::-webkit-scrollbar { display: none; }
+    .chip {
+      padding: 7px 14px; border-radius: 20px; font-size: 12px; font-weight: 700;
+      border: 1px solid var(--border); background: none; color: var(--muted);
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
+      transition: all .2s; font-family: inherit;
+    }
+    .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .list-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 13px 14px; margin-bottom: 9px; cursor: pointer; transition: border-color .2s; }
+    .list-item:active { border-color: var(--accent); }
+    .list-item-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+    .li-pattern { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; margin-right: 8px; }
+    .badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; flex-shrink: 0; }
+    .badge-0 { background: rgba(96,165,250,.2);  color: var(--blue); }
+    .badge-1 { background: rgba(251,191,36,.2);  color: var(--warning); }
+    .badge-2 { background: rgba(251,146,60,.2);  color: #fb923c; }
+    .badge-3 { background: rgba(167,139,250,.2); color: var(--accent-light); }
+    .badge-4 { background: rgba(74,222,128,.2);  color: var(--success); }
+    .li-trans  { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .li-review { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .li-review.due { color: var(--warning); }
+
+    /* ─── FAB ─── */
+    .fab {
+      position: fixed; bottom: calc(var(--tab-h) + 14px);
+      right: max(16px, calc(50% - 215px + 16px));
+      width: 52px; height: 52px; border-radius: 50%;
+      background: var(--accent); border: none; color: #fff;
+      font-size: 26px; cursor: pointer; display: none;
+      align-items: center; justify-content: center;
+      box-shadow: 0 4px 24px rgba(124,106,252,.5);
+      z-index: 50; transition: transform .15s; line-height: 1;
+    }
+    .fab:active { transform: scale(0.9); }
+
+    /* ─── Modal ─── */
+    #card-modal { display: none; position: fixed; inset: 0; z-index: 300; }
+    #card-modal.open { display: block; }
+    .modal-bg { position: absolute; inset: 0; background: rgba(0,0,0,.65); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+    .modal-sheet {
+      position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px; background: var(--surface);
+      border-radius: 22px 22px 0 0; padding: 20px;
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
+      max-height: 92vh; overflow-y: auto;
+    }
+    .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 18px; }
+    .modal-title  { font-size: 18px; font-weight: 800; margin-bottom: 18px; }
+    .form-label   { display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
+    .form-input   { width: 100%; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; color: var(--text); outline: none; margin-bottom: 14px; font-family: inherit; resize: vertical; transition: border-color .2s; min-height: 44px; }
+    .form-input:focus { border-color: var(--accent); }
+    .modal-btns { display: flex; gap: 10px; margin-top: 4px; }
+    .modal-btns .btn { margin-bottom: 0; flex: 1; }
+
+    /* ─── Empty / KV ─── */
+    .empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+    .empty .e-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty p { font-size: 14px; line-height: 1.6; }
+    .kv-row { display: flex; justify-content: space-between; font-size: 14px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .kv-row:last-child { border-bottom: none; }
+    .kv-row span { color: var(--muted); }
+    .kv-row strong { color: var(--text); }
   </style>
 </head>
 <body>
 <div id="root">
 
+<!-- Loading -->
+<div id="loading">
+  <div class="spin"></div>
+  <p>クラウドに接続中…</p>
+</div>
+
 <!-- Header -->
 <header class="app-header">
   <h1>📚 英語構文マスター</h1>
+  <div class="sync-indicator">
+    <div class="sync-dot" id="sync-dot"></div>
+    <span id="sync-txt"></span>
+  </div>
 </header>
 
 <!-- Main -->
@@ -432,31 +291,19 @@
   <div id="page-today" class="page active">
     <div class="section-header">今日の学習</div>
     <div class="stats-row">
-      <div class="stat-card due">
-        <div class="num" id="s-due">0</div>
-        <div class="lbl">本日の復習</div>
-      </div>
-      <div class="stat-card new">
-        <div class="num" id="s-new">0</div>
-        <div class="lbl">新規</div>
-      </div>
-      <div class="stat-card master">
-        <div class="num" id="s-master">0</div>
-        <div class="lbl">習得済み</div>
-      </div>
+      <div class="stat-card due">  <div class="num" id="s-due">0</div>    <div class="lbl">本日の復習</div></div>
+      <div class="stat-card new">  <div class="num" id="s-new">0</div>    <div class="lbl">新規</div></div>
+      <div class="stat-card master"><div class="num" id="s-master">0</div> <div class="lbl">習得済み</div></div>
     </div>
     <button class="btn btn-primary" id="btn-review" onclick="startStudy('review')">📖 復習を開始</button>
-
     <div style="margin-bottom:4px;">
       <div class="section-title" style="margin-bottom:6px;">新規学習モード</div>
       <div class="dir-toggle">
         <button class="dir-btn active" id="dir-en" onclick="setDir('en2ja',this)">
-          🇬🇧 英文解釈型<br>
-          <span id="dir-en-badge" class="dir-badge">英語 → 日本語</span>
+          🇬🇧 英文解釈型<br><span id="dir-en-badge" class="dir-badge">英語 → 日本語</span>
         </button>
         <button class="dir-btn" id="dir-ja" onclick="setDir('ja2en',this)">
-          ✍️ 英作文型<br>
-          <span id="dir-ja-badge" class="dir-badge-muted">日本語 → 英語</span>
+          ✍️ 英作文型<br><span id="dir-ja-badge" class="dir-badge-muted">日本語 → 英語</span>
         </button>
       </div>
     </div>
@@ -469,9 +316,7 @@
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <div class="section-header" style="margin-bottom:0">カード一覧</div>
       <button class="btn btn-outline" style="width:auto;margin:0;padding:9px 14px;font-size:13px;"
-        onclick="document.getElementById('csv-input').click()">
-        📥 CSVインポート
-      </button>
+        onclick="document.getElementById('csv-input').click()">📥 CSVインポート</button>
       <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(this)">
     </div>
     <input type="search" class="search-box" id="card-search" placeholder="🔍 検索（英語・日本語）" oninput="renderList()">
@@ -494,7 +339,7 @@
     </div>
     <div class="surface">
       <div class="section-title">エビングハウス復習スケジュール</div>
-      <div style="font-size:13px; color:var(--muted); line-height:2;">
+      <div style="font-size:13px;color:var(--muted);line-height:2;">
         <div>🆕 学習直後　→　<b style="color:var(--text)">4日後に復習</b></div>
         <div>✅ 4日後 正解　→　<b style="color:var(--text)">7日後に復習</b></div>
         <div>✅ 7日後 正解　→　<b style="color:var(--text)">11日後に復習</b></div>
@@ -505,7 +350,7 @@
     <div class="surface" id="stats-detail"></div>
   </div>
 
-</div><!-- /app-main -->
+</div>
 
 <!-- FAB -->
 <button class="fab" id="fab" onclick="openModal()">＋</button>
@@ -521,8 +366,7 @@
   <button class="nav-btn" onclick="showPage('cards',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <rect x="2" y="3" width="20" height="14" rx="2"/>
-      <line x1="8" y1="21" x2="16" y2="21"/>
-      <line x1="12" y1="17" x2="12" y2="21"/>
+      <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
     </svg>カード
   </button>
   <button class="nav-btn" onclick="showPage('stats',this)">
@@ -556,28 +400,19 @@
     <div class="modal-handle"></div>
     <div class="modal-title" id="modal-title">カードを追加</div>
     <input type="hidden" id="edit-id">
-
     <label class="form-label">英語構文・フレーズ ＊</label>
-    <textarea class="form-input" id="f-pattern" rows="2"
-      placeholder="例: It is ~ that … (強調構文)"></textarea>
-
+    <textarea class="form-input" id="f-pattern" rows="2" placeholder="例: It is ~ that … (強調構文)"></textarea>
     <label class="form-label">例文（任意）</label>
-    <textarea class="form-input" id="f-example" rows="2"
-      placeholder="例: It is John that broke the window."></textarea>
-
+    <textarea class="form-input" id="f-example" rows="2" placeholder="例: It is John that broke the window."></textarea>
     <label class="form-label">日本語訳・解説 ＊</label>
-    <textarea class="form-input" id="f-translation" rows="2"
-      placeholder="例: ～なのは…だ（It is と that/who で強調したい語を挟む）"></textarea>
-
+    <textarea class="form-input" id="f-translation" rows="2" placeholder="例: ～なのは…だ"></textarea>
     <label class="form-label">メモ（任意）</label>
-    <textarea class="form-input" id="f-note" rows="2"
-      placeholder="使用場面、注意点など"></textarea>
-
+    <textarea class="form-input" id="f-note" rows="2" placeholder="使用場面、注意点など"></textarea>
     <div class="modal-btns">
       <button class="btn btn-outline" onclick="closeModal()">キャンセル</button>
       <button class="btn btn-primary" style="flex:2" onclick="saveCard()">保存</button>
     </div>
-    <div id="del-wrap" style="display:none; margin-top:12px;">
+    <div id="del-wrap" style="display:none;margin-top:12px;">
       <button class="btn btn-outline" style="color:var(--danger);border-color:rgba(248,113,113,.4)"
         onclick="deleteCard()">🗑️ このカードを削除</button>
     </div>
@@ -586,22 +421,103 @@
 
 <script>
 // ────────────────────────────────────────────
-// Storage
+// Supabase 初期化
 // ────────────────────────────────────────────
-const KEY = 'kbm_v1';
-function load() {
-  try { const r = localStorage.getItem(KEY); if (r) return JSON.parse(r); } catch(e){}
-  return { cards: [] };
-}
-let S = load();
-function save() { localStorage.setItem(KEY, JSON.stringify(S)); }
+const SUPABASE_URL = 'https://hlyqmiotvmqixhipqxnb.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_vzwnCTajoIMjQLfFdsOvZg_1QbRao7Q';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ────────────────────────────────────────────
-// Date helpers
+// インメモリ状態
+// ────────────────────────────────────────────
+let cards = [];   // 全カードのキャッシュ
+
+// DB列名(snake_case) ⇔ JS(camelCase) 変換
+function dbToCard(r) {
+  return {
+    id:          r.id,
+    pattern:     r.pattern     || '',
+    example:     r.example     || '',
+    translation: r.translation || '',
+    note:        r.note        || '',
+    stage:       r.stage       ?? 0,
+    learnedAt:   r.learned_at  || null,
+    nextReview:  r.next_review || null,
+    createdAt:   r.created_at  || today(),
+    log:         r.log         || [],
+  };
+}
+function cardToDb(c) {
+  return {
+    id:          c.id,
+    pattern:     c.pattern,
+    example:     c.example     || null,
+    translation: c.translation,
+    note:        c.note        || null,
+    stage:       c.stage,
+    learned_at:  c.learnedAt   || null,
+    next_review: c.nextReview  || null,
+    created_at:  c.createdAt   || today(),
+    log:         c.log         || [],
+  };
+}
+
+// ────────────────────────────────────────────
+// 同期インジケーター
+// ────────────────────────────────────────────
+function setSyncStatus(status, msg) {
+  const dot = document.getElementById('sync-dot');
+  const txt = document.getElementById('sync-txt');
+  dot.className = 'sync-dot ' + status;
+  txt.textContent = msg;
+}
+
+// ────────────────────────────────────────────
+// Supabase CRUD
+// ────────────────────────────────────────────
+async function loadAllCards() {
+  setSyncStatus('syncing', '読込中…');
+  const { data, error } = await sb.from('cards').select('*').order('created_at');
+  if (error) { setSyncStatus('error', 'エラー'); console.error(error); return; }
+  cards = (data || []).map(dbToCard);
+  setSyncStatus('ok', '同期済み');
+}
+
+async function upsertCard(card) {
+  setSyncStatus('syncing', '保存中…');
+  const { error } = await sb.from('cards').upsert(cardToDb(card));
+  if (error) { setSyncStatus('error', '保存失敗'); console.error(error); return false; }
+  setSyncStatus('ok', '同期済み');
+  return true;
+}
+
+async function upsertCards(cardList) {
+  if (!cardList.length) return true;
+  setSyncStatus('syncing', '保存中…');
+  // 300件ずつバッチ処理
+  for (let i = 0; i < cardList.length; i += 300) {
+    const batch = cardList.slice(i, i+300).map(cardToDb);
+    const { error } = await sb.from('cards').upsert(batch);
+    if (error) { setSyncStatus('error', '保存失敗'); console.error(error); return false; }
+  }
+  setSyncStatus('ok', '同期済み');
+  return true;
+}
+
+async function deleteCardFromDb(id) {
+  setSyncStatus('syncing', '削除中…');
+  const { error } = await sb.from('cards').delete().eq('id', id);
+  if (error) { setSyncStatus('error', '削除失敗'); console.error(error); return false; }
+  setSyncStatus('ok', '同期済み');
+  return true;
+}
+
+// ────────────────────────────────────────────
+// 日付ヘルパー
 // ────────────────────────────────────────────
 function today() { return new Date().toISOString().slice(0,10); }
 function addDays(d, n) {
-  const dt = new Date(d); dt.setDate(dt.getDate() + n);
+  const dt = new Date(d); dt.setDate(dt.getDate()+n);
   return dt.toISOString().slice(0,10);
 }
 function daysUntil(d) {
@@ -610,39 +526,34 @@ function daysUntil(d) {
 }
 
 // ────────────────────────────────────────────
-// Spaced Repetition Logic
-// Stage: 0=new, 1→review@+4d, 2→review@+7d, 3→review@+11d, 4=mastered
-// Intervals based on firstLearnedAt: 4d, 7d, 11d
+// エビングハウスロジック
 // ────────────────────────────────────────────
-function getDue()     { const t=today(); return S.cards.filter(c=>c.stage>=1&&c.stage<=3&&c.nextReview<=t); }
-function getNew()     { return S.cards.filter(c=>c.stage===0); }
-function getMastered(){ return S.cards.filter(c=>c.stage===4); }
+function getDue()     { const t=today(); return cards.filter(c=>c.stage>=1&&c.stage<=3&&c.nextReview<=t); }
+function getNew()     { return cards.filter(c=>c.stage===0); }
+function getMastered(){ return cards.filter(c=>c.stage===4); }
 
-function markLearned(card) {
+async function markLearned(card) {
   const t = today();
-  card.stage = 1;
-  card.learnedAt = t;
-  card.nextReview = addDays(t, 4);
-  (card.log = card.log||[]).push({d:t, a:'learn'});
-  save();
+  card.stage=1; card.learnedAt=t; card.nextReview=addDays(t,4);
+  card.log = [...(card.log||[]), {d:t, a:'learn'}];
+  await upsertCard(card);
 }
 
-function markReview(card, pass) {
+async function markReview(card, pass) {
   const t = today();
-  (card.log = card.log||[]).push({d:t, a:pass?'pass':'fail', s:card.stage});
+  card.log = [...(card.log||[]), {d:t, a:pass?'pass':'fail', s:card.stage}];
   if (pass) {
-    if (card.stage===1) { card.stage=2; card.nextReview=addDays(card.learnedAt,7); }
+    if      (card.stage===1) { card.stage=2; card.nextReview=addDays(card.learnedAt,7); }
     else if (card.stage===2) { card.stage=3; card.nextReview=addDays(card.learnedAt,11); }
     else if (card.stage===3) { card.stage=4; card.nextReview=null; }
   } else {
-    // Reset: restart the 4-7-11 cycle from today
     card.stage=1; card.learnedAt=t; card.nextReview=addDays(t,4);
   }
-  save();
+  await upsertCard(card);
 }
 
 // ────────────────────────────────────────────
-// Navigation
+// ナビゲーション
 // ────────────────────────────────────────────
 function showPage(name, btn) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -656,7 +567,7 @@ function showPage(name, btn) {
 }
 
 // ────────────────────────────────────────────
-// Today Page
+// 今日タブ
 // ────────────────────────────────────────────
 function renderToday() {
   const due=getDue(), nw=getNew(), ms=getMastered();
@@ -666,27 +577,24 @@ function renderToday() {
   document.getElementById('btn-review').disabled  = due.length===0;
   document.getElementById('btn-new').disabled     = nw.length===0;
 
-  const total = S.cards.length;
-  const stages = [0,1,2,3,4].map(s=>S.cards.filter(c=>c.stage===s).length);
+  const total  = cards.length;
+  const stages = [0,1,2,3,4].map(s=>cards.filter(c=>c.stage===s).length);
   const labels = ['未学習','4日後復習','7日後復習','11日後復習','習得済み'];
   const colors = ['var(--blue)','var(--warning)','#fb923c','var(--accent-light)','var(--success)'];
 
   let html='';
-  if (total===0) {
+  if (!total) {
     html='<div class="empty"><div class="e-icon">📭</div><p>カードがありません<br>「カード」タブから追加しましょう</p></div>';
   } else {
     html=`<div class="section-title">全体 ${total}枚</div>`;
     for(let i=0;i<=4;i++){
       if(!stages[i]) continue;
-      const pct = Math.round(stages[i]/total*100);
+      const pct=Math.round(stages[i]/total*100);
       html+=`<div class="stage-row">
         <div class="stage-row-header">
-          <span style="color:${colors[i]}">${labels[i]}</span>
-          <span>${stages[i]}枚</span>
+          <span style="color:${colors[i]}">${labels[i]}</span><span>${stages[i]}枚</span>
         </div>
-        <div class="bar-track">
-          <div class="bar-fill" style="width:${pct}%;background:${colors[i]}"></div>
-        </div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${colors[i]}"></div></div>
       </div>`;
     }
   }
@@ -694,7 +602,7 @@ function renderToday() {
 }
 
 // ────────────────────────────────────────────
-// Study Mode
+// 学習モード
 // ────────────────────────────────────────────
 let queue=[], qi=0, mode='review', flipped=false, studyDir='en2ja';
 
@@ -702,22 +610,16 @@ function setDir(dir, btn) {
   studyDir = dir;
   document.querySelectorAll('.dir-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  // swap badge styles
-  const enBadge = document.getElementById('dir-en-badge');
-  const jaBadge = document.getElementById('dir-ja-badge');
-  if (dir==='en2ja') {
-    enBadge.className='dir-badge'; jaBadge.className='dir-badge-muted';
-  } else {
-    enBadge.className='dir-badge-muted'; jaBadge.className='dir-badge';
-  }
+  document.getElementById('dir-en-badge').className = dir==='en2ja'?'dir-badge':'dir-badge-muted';
+  document.getElementById('dir-ja-badge').className = dir==='ja2en'?'dir-badge':'dir-badge-muted';
 }
 
 function startStudy(m) {
-  mode = m;
-  queue = (m==='review' ? getDue() : getNew()).sort(()=>Math.random()-.5);
-  qi = 0; flipped = false;
-  const dirLabel = mode==='new' ? (studyDir==='en2ja' ? ' ／ 英文解釈型' : ' ／ 英作文型') : '';
-  document.getElementById('st-title').textContent = m==='review' ? '📖 復習' : `✨ 新規学習${dirLabel}`;
+  mode=m;
+  queue=(m==='review'?getDue():getNew()).sort(()=>Math.random()-.5);
+  qi=0; flipped=false;
+  const dirLabel=mode==='new'?(studyDir==='en2ja'?' ／ 英文解釈型':' ／ 英作文型'):'';
+  document.getElementById('st-title').textContent = m==='review'?'📖 復習':`✨ 新規学習${dirLabel}`;
   document.getElementById('study-overlay').classList.add('open');
   renderCard();
 }
@@ -726,115 +628,92 @@ function closeStudy() {
   renderToday();
 }
 function renderCard() {
-  const total = queue.length;
-  document.getElementById('st-bar').style.width = (qi/total*100)+'%';
-  document.getElementById('st-prog').textContent = qi<total ? `${qi+1} / ${total}` : `完了！`;
+  const total=queue.length;
+  document.getElementById('st-bar').style.width=(qi/total*100)+'%';
+  document.getElementById('st-prog').textContent=qi<total?`${qi+1} / ${total}`:'完了！';
 
-  if (qi >= total) {
+  if (qi>=total) {
     document.getElementById('study-body').innerHTML=`
       <div class="study-done">
         <div class="icon">🎉</div>
         <h2>お疲れ様でした！</h2>
         <p>${total}枚の${mode==='review'?'復習':'学習'}が完了しました。<br>継続は力なり！</p>
         <br>
-        <button class="btn btn-primary" onclick="closeStudy()" style="max-width:200px;margin:0 auto;">
-          閉じる
-        </button>
+        <button class="btn btn-primary" onclick="closeStudy()" style="max-width:200px;margin:0 auto;">閉じる</button>
       </div>`;
     return;
   }
 
-  const c = queue[qi]; flipped = false;
-
-  // Direction: en2ja=英文解釈型（英語→日本語）, ja2en=英作文型（日本語→英語）
-  const isJaFirst = (mode==='new' && studyDir==='ja2en');
-
-  const frontLabel = isJaFirst ? '日本語訳・解説' : '英語構文';
-  const frontMain  = isJaFirst
-    ? `<div class="fc-translation" style="color:var(--accent-light)">${esc(c.translation)}</div>`
-    : `<div class="fc-pattern">${esc(c.pattern)}</div>${c.example?`<div class="fc-example">${esc(c.example)}</div>`:''}`;
-
-  const backLabel  = isJaFirst ? '英語構文' : '日本語訳・解説';
-  const backMain   = isJaFirst
-    ? `<div class="fc-pattern" style="color:#fff">${esc(c.pattern)}</div>
-       ${c.example?`<div class="fc-example">${esc(c.example)}</div>`:''}`
-    : `<div class="fc-translation">${esc(c.translation)}</div>
-       ${c.note?`<div class="fc-note">${esc(c.note)}</div>`:''}`;
+  const c=queue[qi]; flipped=false;
+  const isJaFirst=(mode==='new'&&studyDir==='ja2en');
+  const frontLabel=isJaFirst?'日本語訳・解説':'英語構文';
+  const frontMain =isJaFirst
+    ?`<div class="fc-translation" style="color:var(--accent-light)">${esc(c.translation)}</div>`
+    :`<div class="fc-pattern">${esc(c.pattern)}</div>${c.example?`<div class="fc-example">${esc(c.example)}</div>`:''}`;
+  const backLabel =isJaFirst?'英語構文':'日本語訳・解説';
+  const backMain  =isJaFirst
+    ?`<div class="fc-pattern" style="color:#fff">${esc(c.pattern)}</div>${c.example?`<div class="fc-example">${esc(c.example)}</div>`:''}`
+    :`<div class="fc-translation">${esc(c.translation)}</div>${c.note?`<div class="fc-note">${esc(c.note)}</div>`:''}`;
 
   document.getElementById('study-body').innerHTML=`
     <div class="fc-scene" onclick="flip()">
       <div class="fc-inner" id="fc">
-        <div class="fc-face fc-front">
-          <div class="fc-label">${frontLabel}</div>
-          ${frontMain}
-        </div>
-        <div class="fc-face fc-back">
-          <div class="fc-label">${backLabel}</div>
-          ${backMain}
-        </div>
+        <div class="fc-face fc-front"><div class="fc-label">${frontLabel}</div>${frontMain}</div>
+        <div class="fc-face fc-back"><div class="fc-label">${backLabel}</div>${backMain}</div>
       </div>
     </div>
     <div class="tap-hint" id="hint">タップして答えを確認 👆</div>
     <div class="study-actions" id="acts">
       ${mode==='new'
-        ?`<button class="btn btn-danger"  onclick="act(false)">もう一度</button>
+        ?`<button class="btn btn-danger" onclick="act(false)">もう一度</button>
           <button class="btn btn-success" onclick="act(true)">覚えた！ ✓</button>`
-        :`<button class="btn btn-danger"  onclick="act(false)">❌ 不正解</button>
-          <button class="btn btn-success" onclick="act(true)">✅ 正解</button>`
-      }
+        :`<button class="btn btn-danger" onclick="act(false)">❌ 不正解</button>
+          <button class="btn btn-success" onclick="act(true)">✅ 正解</button>`}
     </div>`;
 }
 function flip() {
-  flipped = !flipped;
-  document.getElementById('fc')?.classList.toggle('flipped', flipped);
-  const acts = document.getElementById('acts');
-  const hint = document.getElementById('hint');
-  if (flipped) { acts.classList.add('visible'); hint.textContent='正解でしたか？'; }
-  else          { acts.classList.remove('visible'); hint.textContent='タップして答えを確認 👆'; }
+  flipped=!flipped;
+  document.getElementById('fc')?.classList.toggle('flipped',flipped);
+  const acts=document.getElementById('acts'), hint=document.getElementById('hint');
+  if(flipped){acts.classList.add('visible');hint.textContent='正解でしたか？';}
+  else       {acts.classList.remove('visible');hint.textContent='タップして答えを確認 👆';}
 }
-function act(pass) {
-  const c = queue[qi];
+async function act(pass) {
+  const c=queue[qi];
   if (mode==='new') {
-    if (pass) { markLearned(c); qi++; }
-    else { queue.push(queue.splice(qi,1)[0]); } // put at end, stay at qi
+    if (pass) { await markLearned(c); qi++; }
+    else { queue.push(queue.splice(qi,1)[0]); }
   } else {
-    markReview(c, pass); qi++;
+    await markReview(c,pass); qi++;
   }
   renderCard();
 }
 
 // ────────────────────────────────────────────
-// Card List
+// カード一覧
 // ────────────────────────────────────────────
 let filter='all';
-function setChip(btn, f) {
-  document.querySelectorAll('.chip').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active'); filter=f; renderList();
-}
-function renderList() {
-  const q = (document.getElementById('card-search')?.value||'').toLowerCase();
-  const labels=['未学習','4日後','7日後','11日後','習得済み'];
+function setChip(btn,f){ document.querySelectorAll('.chip').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); filter=f; renderList(); }
 
-  let cards = [...S.cards];
-  if (filter==='0') cards=cards.filter(c=>c.stage===0);
-  else if (filter==='4') cards=cards.filter(c=>c.stage===4);
-  else if (filter==='review') cards=cards.filter(c=>c.stage>=1&&c.stage<=3);
-  if (q) cards=cards.filter(c=>
-    c.pattern.toLowerCase().includes(q)||
-    c.translation.toLowerCase().includes(q)||
-    (c.example||'').toLowerCase().includes(q)
-  );
+function renderList() {
+  const q=(document.getElementById('card-search')?.value||'').toLowerCase();
+  const labels=['未学習','4日後','7日後','11日後','習得済み'];
+  let list=[...cards];
+  if(filter==='0') list=list.filter(c=>c.stage===0);
+  else if(filter==='4') list=list.filter(c=>c.stage===4);
+  else if(filter==='review') list=list.filter(c=>c.stage>=1&&c.stage<=3);
+  if(q) list=list.filter(c=>c.pattern.toLowerCase().includes(q)||c.translation.toLowerCase().includes(q)||(c.example||'').toLowerCase().includes(q));
 
   let html='';
-  if (!cards.length) {
+  if(!list.length){
     html='<div class="empty"><div class="e-icon">🔍</div><p>カードが見つかりません</p></div>';
   } else {
-    html = cards.map(c=>{
-      const du = daysUntil(c.nextReview);
+    html=list.map(c=>{
+      const du=daysUntil(c.nextReview);
       let ri='';
-      if (c.stage>=1&&c.stage<=3) {
-        if (du<=0) ri=`<div class="li-review due">⚡ 今日が復習日</div>`;
-        else if (du===1) ri=`<div class="li-review">明日が復習日</div>`;
+      if(c.stage>=1&&c.stage<=3){
+        if(du<=0) ri=`<div class="li-review due">⚡ 今日が復習日</div>`;
+        else if(du===1) ri=`<div class="li-review">明日が復習日</div>`;
         else ri=`<div class="li-review">${du}日後に復習</div>`;
       }
       return `<div class="list-item" onclick="openModal('${c.id}')">
@@ -842,8 +721,7 @@ function renderList() {
           <div class="li-pattern">${esc(c.pattern)}</div>
           <span class="badge badge-${c.stage}">${labels[c.stage]}</span>
         </div>
-        <div class="li-trans">${esc(c.translation)}</div>
-        ${ri}
+        <div class="li-trans">${esc(c.translation)}</div>${ri}
       </div>`;
     }).join('');
   }
@@ -851,60 +729,48 @@ function renderList() {
 }
 
 // ────────────────────────────────────────────
-// Stats Page
+// 統計
 // ────────────────────────────────────────────
 function renderStats() {
-  const total=S.cards.length;
-  const stages=[0,1,2,3,4].map(s=>S.cards.filter(c=>c.stage===s).length);
+  const total=cards.length;
+  const stages=[0,1,2,3,4].map(s=>cards.filter(c=>c.stage===s).length);
   const labels=['未学習','4日後に復習','7日後に復習','11日後に復習','習得済み'];
   const colors=['var(--blue)','var(--warning)','#fb923c','var(--accent-light)','var(--success)'];
-
   let ph='';
-  if (!total) { ph='<div style="color:var(--muted);font-size:13px;">カードがありません</div>'; }
+  if(!total){ ph='<div style="color:var(--muted);font-size:13px;">カードがありません</div>'; }
   else {
     for(let i=0;i<=4;i++){
       const pct=Math.round(stages[i]/total*100);
       ph+=`<div class="stage-row">
-        <div class="stage-row-header">
-          <span style="color:${colors[i]}">${labels[i]}</span>
-          <span>${stages[i]}枚 (${pct}%)</span>
-        </div>
-        <div class="bar-track">
-          <div class="bar-fill" style="width:${pct}%;background:${colors[i]}"></div>
-        </div>
+        <div class="stage-row-header"><span style="color:${colors[i]}">${labels[i]}</span><span>${stages[i]}枚 (${pct}%)</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${colors[i]}"></div></div>
       </div>`;
     }
   }
   document.getElementById('prog-bars').innerHTML=ph;
-
-  const totalLogs=S.cards.reduce((a,c)=>a+(c.log?.length||0),0);
-  const totalPass=S.cards.reduce((a,c)=>a+(c.log?.filter(l=>l.a==='pass').length||0),0);
-  const totalFail=S.cards.reduce((a,c)=>a+(c.log?.filter(l=>l.a==='fail').length||0),0);
+  const totalPass=cards.reduce((a,c)=>a+(c.log?.filter(l=>l.a==='pass').length||0),0);
+  const totalFail=cards.reduce((a,c)=>a+(c.log?.filter(l=>l.a==='fail').length||0),0);
   const acc=totalPass+totalFail>0?Math.round(totalPass/(totalPass+totalFail)*100):'-';
-
   document.getElementById('stats-detail').innerHTML=`
     <div class="section-title">詳細データ</div>
     <div class="kv-row"><span>合計カード数</span><strong>${total}枚</strong></div>
-    <div class="kv-row"><span>学習済み（ステージ1以上）</span><strong>${S.cards.filter(c=>c.stage>=1).length}枚</strong></div>
+    <div class="kv-row"><span>学習済み（ステージ1以上）</span><strong>${cards.filter(c=>c.stage>=1).length}枚</strong></div>
     <div class="kv-row"><span>本日の復習数</span><strong style="color:var(--warning)">${getDue().length}枚</strong></div>
     <div class="kv-row"><span>習得完了</span><strong style="color:var(--success)">${stages[4]}枚</strong></div>
-    <div class="kv-row"><span>総復習回数</span><strong>${totalLogs}回</strong></div>
-    <div class="kv-row"><span>正解率</span><strong>${acc}%</strong></div>
-  `;
+    <div class="kv-row"><span>総復習回数</span><strong>${cards.reduce((a,c)=>a+(c.log?.length||0),0)}回</strong></div>
+    <div class="kv-row"><span>正解率</span><strong>${acc}%</strong></div>`;
 }
 
 // ────────────────────────────────────────────
-// Modal
+// カードモーダル
 // ────────────────────────────────────────────
 function openModal(id) {
-  const modal=document.getElementById('card-modal');
   ['f-pattern','f-example','f-translation','f-note'].forEach(k=>document.getElementById(k).value='');
   document.getElementById('edit-id').value='';
   document.getElementById('del-wrap').style.display='none';
-
   if (id) {
-    const c=S.cards.find(c=>c.id===id);
-    if (c) {
+    const c=cards.find(c=>c.id===id);
+    if(c){
       document.getElementById('modal-title').textContent='カードを編集';
       document.getElementById('f-pattern').value=c.pattern||'';
       document.getElementById('f-example').value=c.example||'';
@@ -916,154 +782,119 @@ function openModal(id) {
   } else {
     document.getElementById('modal-title').textContent='カードを追加';
   }
-  modal.classList.add('open');
+  document.getElementById('card-modal').classList.add('open');
 }
-function closeModal() { document.getElementById('card-modal').classList.remove('open'); }
-function saveCard() {
+function closeModal(){ document.getElementById('card-modal').classList.remove('open'); }
+
+async function saveCard() {
   const pattern=document.getElementById('f-pattern').value.trim();
   const translation=document.getElementById('f-translation').value.trim();
   if(!pattern||!translation){ alert('英語構文と日本語訳は必須です'); return; }
   const example=document.getElementById('f-example').value.trim();
   const note=document.getElementById('f-note').value.trim();
   const eid=document.getElementById('edit-id').value;
-  if (eid) {
-    const c=S.cards.find(c=>c.id===eid);
-    if(c){ c.pattern=pattern; c.example=example; c.translation=translation; c.note=note; save(); }
+
+  if(eid){
+    const c=cards.find(c=>c.id===eid);
+    if(c){ c.pattern=pattern; c.example=example; c.translation=translation; c.note=note; await upsertCard(c); }
   } else {
-    S.cards.push({ id:Date.now()+'', pattern, example, translation, note,
-      stage:0, learnedAt:null, nextReview:null, createdAt:today(), log:[] });
-    save();
+    const c={ id:Date.now()+'-'+Math.random().toString(36).slice(2), pattern, example, translation, note,
+      stage:0, learnedAt:null, nextReview:null, createdAt:today(), log:[] };
+    cards.push(c);
+    await upsertCard(c);
   }
-  closeModal(); renderList();
+  closeModal(); renderList(); renderToday();
 }
-function deleteCard() {
+
+async function deleteCard() {
   const eid=document.getElementById('edit-id').value;
-  if (!eid||!confirm('このカードを削除しますか？')) return;
-  S.cards=S.cards.filter(c=>c.id!==eid);
-  save(); closeModal(); renderList();
+  if(!eid||!confirm('このカードを削除しますか？')) return;
+  const ok=await deleteCardFromDb(eid);
+  if(ok){ cards=cards.filter(c=>c.id!==eid); closeModal(); renderList(); renderToday(); }
 }
 
 // ────────────────────────────────────────────
-// CSV Import
-// Supports: UTF-8 / Shift-JIS (CP932)
-// Layout: pattern, example, translation, note
+// CSVインポート（Supabase版）
 // ────────────────────────────────────────────
 function importCSV(input) {
-  const file = input.files[0];
-  if (!file) return;
-  input.value = ''; // reset so same file can be re-selected
-
-  const reader = new FileReader();
-
-  // Try UTF-8 first; if garbled (replacement chars), retry as Shift-JIS
-  reader.onload = e => {
-    let text = e.target.result;
-    if (text.includes('\uFFFD')) {
-      // Re-read as Shift-JIS
-      const r2 = new FileReader();
-      r2.onload = e2 => processCSV(e2.target.result);
-      r2.readAsText(file, 'Shift-JIS');
-    } else {
-      processCSV(text);
-    }
+  const file=input.files[0]; if(!file) return; input.value='';
+  const reader=new FileReader();
+  reader.onload=e=>{
+    let text=e.target.result;
+    if(text.includes('\uFFFD')){ const r2=new FileReader(); r2.onload=e2=>processCSV(e2.target.result); r2.readAsText(file,'Shift-JIS'); }
+    else processCSV(text);
   };
-  reader.readAsText(file, 'UTF-8');
+  reader.readAsText(file,'UTF-8');
 }
 
-function processCSV(text) {
-  // Normalize line endings
-  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l=>l.trim());
-  if (lines.length < 2) { showImportResult('error','データ行がありません'); return; }
-
-  // Parse header and find column indices
-  const header = parseCSVRow(lines[0]).map(h=>h.toLowerCase().trim());
-  const ci = {
-    pattern:     header.indexOf('pattern'),
-    example:     header.indexOf('example'),
-    translation: header.indexOf('translation'),
-    note:        header.indexOf('note'),
-  };
-  if (ci.pattern<0 || ci.translation<0) {
-    showImportResult('error','ヘッダーに pattern / translation 列が見つかりません');
-    return;
-  }
+async function processCSV(text) {
+  const lines=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l=>l.trim());
+  if(lines.length<2){ showImportResult('error','データ行がありません'); return; }
+  const header=parseCSVRow(lines[0]).map(h=>h.toLowerCase().trim());
+  const ci={ pattern:header.indexOf('pattern'), example:header.indexOf('example'), translation:header.indexOf('translation'), note:header.indexOf('note') };
+  if(ci.pattern<0||ci.translation<0){ showImportResult('error','ヘッダーに pattern / translation 列が見つかりません'); return; }
 
   let added=0, skipped=0, errors=0;
-  const existingPatterns = new Set(S.cards.map(c=>c.pattern.trim().toLowerCase()));
+  const existingPatterns=new Set(cards.map(c=>c.pattern.trim().toLowerCase()));
+  const newCards=[];
 
-  for (let i=1; i<lines.length; i++) {
-    const row = parseCSVRow(lines[i]);
-    const pattern     = (row[ci.pattern]    ||'').trim();
-    const translation = (row[ci.translation]||'').trim();
-    if (!pattern || !translation) { errors++; continue; }
-    if (existingPatterns.has(pattern.toLowerCase())) { skipped++; continue; }
-
-    S.cards.push({
-      id: Date.now()+'-'+i,
-      pattern,
-      example:     ci.example>=0     ? (row[ci.example]||'').trim()  : '',
-      translation,
-      note:        ci.note>=0         ? (row[ci.note]||'').trim()     : '',
-      stage: 0, learnedAt: null, nextReview: null,
-      createdAt: today(), log: []
-    });
+  for(let i=1;i<lines.length;i++){
+    const row=parseCSVRow(lines[i]);
+    const pattern=(row[ci.pattern]||'').trim();
+    const translation=(row[ci.translation]||'').trim();
+    if(!pattern||!translation){ errors++; continue; }
+    if(existingPatterns.has(pattern.toLowerCase())){ skipped++; continue; }
+    const c={ id:Date.now()+'-'+i+'-'+Math.random().toString(36).slice(2), pattern,
+      example:ci.example>=0?(row[ci.example]||'').trim():'',
+      translation, note:ci.note>=0?(row[ci.note]||'').trim():'',
+      stage:0, learnedAt:null, nextReview:null, createdAt:today(), log:[] };
+    newCards.push(c);
     existingPatterns.add(pattern.toLowerCase());
     added++;
   }
-  save();
-  renderList();
-  renderToday();
 
-  const msg = `✅ ${added}件追加 ${skipped?`／ ${skipped}件スキップ（重複）`:''}${errors?`／ ${errors}件エラー`:''}`;
+  if(newCards.length>0){
+    const ok=await upsertCards(newCards);
+    if(ok){ cards.push(...newCards); renderList(); renderToday(); }
+  }
+  const msg=`✅ ${added}件追加 ${skipped?`／ ${skipped}件スキップ（重複）`:''}${errors?`／ ${errors}件エラー`:''}`;
   showImportResult(added>0?'success':'warn', msg);
 }
 
-// RFC 4180 compliant CSV row parser
-function parseCSVRow(line) {
-  const cols = []; let cur = '', inQ = false;
-  for (let i=0; i<line.length; i++) {
-    const ch = line[i];
-    if (inQ) {
-      if (ch==='"' && line[i+1]==='"') { cur+='"'; i++; }
-      else if (ch==='"') inQ=false;
-      else cur+=ch;
-    } else {
-      if (ch==='"') inQ=true;
-      else if (ch===',') { cols.push(cur); cur=''; }
-      else cur+=ch;
-    }
+function parseCSVRow(line){
+  const cols=[]; let cur='', inQ=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(inQ){ if(ch==='"'&&line[i+1]==='"'){cur+='"';i++;} else if(ch==='"')inQ=false; else cur+=ch; }
+    else   { if(ch==='"')inQ=true; else if(ch===','){cols.push(cur);cur='';} else cur+=ch; }
   }
-  cols.push(cur);
-  return cols;
+  cols.push(cur); return cols;
 }
 
-function showImportResult(type, msg) {
-  const el = document.getElementById('import-result');
-  const colors = { success:'var(--success)', warn:'var(--warning)', error:'var(--danger)' };
-  el.style.display = 'block';
-  el.style.cssText = `display:block;padding:10px 14px;border-radius:10px;font-size:13px;font-weight:600;
-    background:rgba(0,0,0,.3);border:1px solid ${colors[type]};color:${colors[type]};margin-bottom:10px;`;
-  el.textContent = msg;
-  setTimeout(()=>{ el.style.display='none'; }, 5000);
+function showImportResult(type,msg){
+  const el=document.getElementById('import-result');
+  const colors={success:'var(--success)',warn:'var(--warning)',error:'var(--danger)'};
+  el.style.cssText=`display:block;padding:10px 14px;border-radius:10px;font-size:13px;font-weight:600;background:rgba(0,0,0,.3);border:1px solid ${colors[type]};color:${colors[type]};margin-bottom:10px;`;
+  el.textContent=msg;
+  setTimeout(()=>{el.style.display='none';},6000);
 }
 
 // ────────────────────────────────────────────
-// Util
+// ユーティリティ
 // ────────────────────────────────────────────
-function esc(s) {
-  if(!s) return '';
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+function esc(s){ if(!s)return''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ────────────────────────────────────────────
-// Init
+// 初期化
 // ────────────────────────────────────────────
-renderToday();
-if('serviceWorker' in navigator) {
-  window.addEventListener('load', ()=>
-    navigator.serviceWorker.register('sw.js').catch(()=>{})
-  );
-}
+(async()=>{
+  await loadAllCards();
+  document.getElementById('loading').style.display='none';
+  renderToday();
+  if('serviceWorker' in navigator){
+    window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  }
+})();
 </script>
 </body>
 </html>
