@@ -1,0 +1,19 @@
+{
+  "name": "英語構文マスター",
+  "short_name": "構文マスター",
+  "description": "エビングハウスの忘却曲線（4日・7日・11日）に基づく英語構文学習アプリ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0d0d1a",
+  "theme_color": "#7c6afc",
+  "orientation": "portrait-primary",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
